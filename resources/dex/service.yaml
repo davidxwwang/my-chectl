@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: dex
+  labels:
+    app: dex
+spec:
+  type: NodePort
+  ports:
+  - name: dex
+    port: 5556
+    protocol: TCP
+  - name: grpc
+    protocol: TCP
+    port: 5557
+    targetPort: 5557
+    nodePort: 30007
+  selector:
+    app: dex

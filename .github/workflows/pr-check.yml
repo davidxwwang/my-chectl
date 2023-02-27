@@ -1,0 +1,91 @@
+#
+# Copyright (c) 2019-2021 Red Hat, Inc.
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#   Red Hat, Inc. - initial API and implementation
+#
+
+name: PR Checks
+on: [pull_request]
+jobs:
+  unit-tests:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install NodeJS
+        uses: actions/setup-node@v2.1.2
+        with:
+          node-version: 16.13.2
+      - name: Build chectl
+        run: yarn
+      - name: Run eslint
+        run: yarn lint
+      - name: Run unit tests
+        run: yarn test
+  readme-md-validation:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install NodeJS
+        uses: actions/setup-node@v2.1.2
+        with:
+          node-version: 16.13
+      - name: Build chectl
+        run: yarn
+      - name: Build README.md
+        run: yarn oclif-dev readme
+      - name: Check README.md state
+        run: |
+          IFS=$'\n' read -d '' -r -a FILES_CHANGED_ARRAY < <( git ls-files -m ) || true
+          # check if readme it is up to date
+          if [[ " ${FILES_CHANGED_ARRAY[@]} " =~ "README.md" ]]; then
+            echo "[ERROR] README.md it is not up to date. Please run 'yarn oclif-dev readme' to update and commit the changes."
+            exit 1
+          fi
+  license-validation:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install NodeJS
+        uses: actions/setup-node@v2.1.2
+        with:
+          node-version: 16.13
+      - name: Build chectl
+        run: yarn
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.15
+      - name: Check license headers
+        run: |
+          export GO111MODULE=on
+          go get -u github.com/che-incubator/check-license-header@379ba18fdb906d341ae451ea155cc34f1c4b4f1a
+          echo "[INFO] Check license headers."
+          FILES_TO_CHECK_LICENSE=$(find . \
+          -not -path "./tmp/*" \
+          -not -path "./node_modules/*" \
+          -not -path "./resources/*" \
+          -not -path "./templates/*" \
+          -not -path "./lib/*" \
+          \( -name "*.ts" -o -name "*.yaml" -o -name "*.yml" -o -name "*.sh" \))
+
+          LICENSE_TEMPLATE="${GITHUB_WORKSPACE}/hack/license-header.txt"
+
+          check-license-header -f "${LICENSE_TEMPLATE}" ${FILES_TO_CHECK_LICENSE}

@@ -1,0 +1,52 @@
+#
+# Copyright (c) 2019-2021 Red Hat, Inc.
+# This program and the accompanying materials are made
+# available under the terms of the Eclipse Public License 2.0
+# which is available at https://www.eclipse.org/legal/epl-2.0/
+#
+# SPDX-License-Identifier: EPL-2.0
+#
+# Contributors:
+#   Red Hat, Inc. - initial API and implementation
+#
+
+name: Test release binaries
+on: pull_request
+jobs:
+  release-test:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2.3.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Start minikube cluster
+      uses: che-incubator/setup-minikube-action@next
+      with:
+        minikube-version: v1.23.2
+    - name: Install NodeJS
+      uses: actions/setup-node@v2.1.2
+      with:
+        node-version: 16.13.2
+    - name: Pack chectl binaries
+      run: yarn && npx oclif-dev pack --targets=linux-x64
+    - name: UnPack chectl binaries in $HOME/chectl
+      run: |
+        # Will unpack chectl binaries in $HOME/chectl
+        tar -xvf dist/channels/*/chectl-linux-x64.tar.gz -C $HOME
+        echo "$HOME/chectl/bin" >> $GITHUB_PATH
+        rm -rf tmp/
+    - name: Run tests
+      run: |
+        export PLATFORM=minikube
+        export ASSEMBLY_MODE=on
+        export INSTALLER=operator
+
+        which chectl
+        yarn test --coverage=false --forceExit --testRegex=test/e2e/e2e.test.ts
+    - uses: actions/upload-artifact@v2
+      if: ${{ always() }}
+      with:
+        name: test-artifacts
+        path: /tmp/logs/*
